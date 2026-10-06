@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>影片详情 · 青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="site">
+  <div><h1 id="title">影片详情</h1><div class="sub" id="otitle"></div></div>
+  <nav><a href="/index.html">← 返回档案</a><a href="/admin.html">后台管理</a></nav>
+</header>
+<main id="main"><p>加载中…</p></main>
+<footer>可见性由许可实时计算 · 放映记录绑定实际版本</footer>
+<script>
+const id = new URLSearchParams(location.search).get('id');
+const territory = new URLSearchParams(location.search).get('territory') || 'WORLD';
+const labelOf = (l) => ({festival:'影展版',public:'公开版',director:'导演版'}[l]||l);
+const reasonText = (r) => ({ok:'可公开',not_published:'版本未发布',not_approved:'未在批准发布清单',
+  scheduled_future:'定时上线未到',no_license:'无授权',license_expired:'授权已过期',
+  license_terminated:'授权已提前终止',territory_denied:'当前地区未授权',film_hidden:'未公开'}[r]||r);
+
+async function mediaUrl(assetId) {
+  const res = await fetch(`/api/media/${assetId}/request-download`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({territory})});
+  const j = await res.json();
+  return j.stream_url || null;
+}
+
+async function render() {
+  const res = await fetch(`/api/films/${id}?territory=${territory}`);
+  if (!res.ok) { document.getElementById('main').innerHTML = '<p>影片不存在或未公开。</p>'; return; }
+  const f = await res.json();
+  document.getElementById('title').textContent = f.title;
+  document.getElementById('otitle').textContent = [f.original_title, f.year].filter(Boolean).join(' · ');
+
+  let html = '<div class="detail-head"><div id="posterBox"></div><div>';
+  html += `<p>${f.synopsis || ''}</p>`;
+  if (f.published_version) html += `<p style="margin-top:.6rem">当前公开剪辑：<span class="version-tag">${labelOf(f.published_version.label)}</span>${f.published_version.runtime_sec ? ` · ${Math.round(f.published_version.runtime_sec/60)} 分钟` : ''}</p>`;
+  if (f.fallback_text) html += `<div class="notice">📢 ${f.fallback_text}</div>`;
+  html += '</div></div>';
+
+  // 媒介区：预告/剧照/片段/完整片 分别按许可检查
+  html += '<section class="block"><h2>媒介</h2><div class="media-row">';
+  const kinds = [['poster','海报'],['still','剧照'],['trailer','预告片'],['clip','公开片段'],['full_film','完整影片']];
+  for (const [k, name] of kinds) {
+    const m = f.media[k] || {available:false, reason:'no_license'};
+    html += `<div class="media-item"><strong>${name}</strong><div class="meta" id="media-${k}">`;
+    html += m.available ? '<span class="badge ok">可看</span>' : `<span class="badge no">${reasonText(m.reason)}</span>`;
+    html += '</div></div>';
+  }
+  html += '</div></section>';
+
+  // 字幕
+  if (f.subtitles && f.subtitles.length) {
+    html += '<section class="block"><h2>字幕</h2>';
+    for (const s of f.subtitles) {
+      html += `<p>修订 v${s.revision} ${s.available ? `<button onclick="download(${s.asset_id})">下载字幕</button>` : '<span class="badge no">不可下载</span>'}</p>`;
+    }
+    html += '</section>';
+  }
+
+  // 署名：原样展示，可核实标注
+  html += '<section class="block"><h2>署名职责</h2><table><tr><th>姓名</th><th>职责</th><th>核实</th></tr>';
+  for (const c of (f.credits||[])) {
+    html += `<tr><td>${c.person_name}</td><td>${c.role}</td><td>${c.verified ? `✓ ${c.source||''}` : '待核实'}</td></tr>`;
+  }
+  html += '</table></section>';
+
+  // 放映记录：按实际版本标注
+  html += '<section class="block"><h2>放映记录</h2><table><tr><th>日期</th><th>活动/场馆</th><th>地点</th><th>放映版本</th></tr>';
+  for (const s of (f.screenings||[])) {
+    html += `<tr><td>${s.screened_at.slice(0,10)}</td><td>${s.event_name||''}${s.venue? ' · '+s.venue:''}</td>
+      <td>${[s.city,s.country].filter(Boolean).join(', ')}</td>
+      <td><span class="version-tag">${labelOf(s.version_label)}</span></td></tr>`;
+  }
+  html += '</table></section>';
+
+  // 联系表单：分流
+  html += `<section class="block"><h2>联系我们</h2><form class="stack" onsubmit="return submitContact(event)">
+    <select id="c-cat" required><option value="">选择类别…</option>
+      <option value="cooperation">合作洽谈</option><option value="screening">放映申请</option><option value="interview">媒体采访</option></select>
+    <input id="c-name" placeholder="姓名" required><input id="c-email" placeholder="邮箱" required>
+    <input id="c-org" placeholder="机构（可选）"><textarea id="c-msg" placeholder="留言" required rows="3"></textarea>
+    <textarea id="c-priv" placeholder="私密材料（仅管理员可见，不会公开）" rows="2"></textarea>
+    <button>提交</button><div class="msg" id="c-msg-ok"></div></form></section>`;
+
+  document.getElementById('main').innerHTML = html;
+
+  // 填充媒介内容
+  if (f.media.poster.available && f.media.poster.asset_id) {
+    const url = await mediaUrl(f.media.poster.asset_id);
+    if (url) document.getElementById('posterBox').innerHTML = `<img src="${url}" alt="海报">`;
+  } else document.getElementById('posterBox').innerHTML = '<div class="notice">海报暂不可公开</div>';
+  for (const k of ['still','trailer','clip','full_film']) {
+    const m = f.media[k];
+    if (m && m.available && m.asset_id) {
+      const url = await mediaUrl(m.asset_id);
+      if (url) document.getElementById(`media-${k}`).innerHTML +=
+        k === 'still' ? `<img src="${url}" style="margin-top:.5rem">`
+                      : ` <a href="${url}" target="_blank">▶ 播放/下载</a>`;
+    }
+  }
+}
+async function download(assetId) {
+  const j = await (await fetch(`/api/media/${assetId}/request-download`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({territory})})).json();
+  if (j.stream_url) location.href = j.stream_url; else alert('不可下载：' + (j.reason||''));
+}
+async function submitContact(e) {
+  e.preventDefault();
+  const body = { category: document.getElementById('c-cat').value, name: document.getElementById('c-name').value,
+    email: document.getElementById('c-email').value, org: document.getElementById('c-org').value,
+    message: document.getElementById('c-msg').value, private_material: document.getElementById('c-priv').value };
+  const res = await fetch('/api/contact', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const el = document.getElementById('c-msg-ok');
+  el.className = res.ok ? 'msg ok' : 'msg err';
+  el.textContent = res.ok ? '已提交，我们会按类别转交处理。' : '提交失败，请检查填写。';
+  return false;
+}
+render();
+</script>
+</body>
+</html>

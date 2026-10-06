@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后台管理 · 青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="site">
+  <div><h1>后台管理</h1><div class="sub">ARCHIVE ADMIN</div></div>
+  <nav><a href="/index.html">← 公开档案</a></nav>
+</header>
+<main>
+  <div id="login" class="panel" style="max-width:420px">
+    <h3>管理员登录</h3>
+    <div class="row"><input id="token" placeholder="管理令牌（token-admin-a / token-admin-b）" style="flex:1"><button onclick="login()">登录</button></div>
+    <div class="msg" id="loginMsg"></div>
+  </div>
+  <div id="console" style="display:none" class="admin-layout">
+    <div class="admin-menu">
+      <button data-p="overview" onclick="show('overview')">总览</button>
+      <button data-p="film" onclick="show('film')">新建影片 / 署名</button>
+      <button data-p="version" onclick="show('version')">剪辑版本与发布</button>
+      <button data-p="license" onclick="show('license')">许可管理</button>
+      <button data-p="asset" onclick="show('asset')">资产与字幕修订</button>
+      <button data-p="screening" onclick="show('screening')">放映记录补录</button>
+      <button data-p="contacts" onclick="show('contacts')">联系表单队列</button>
+      <button data-p="audit" onclick="show('audit')">审计日志</button>
+    </div>
+    <div>
+      <div class="msg" id="msg"></div>
+
+      <div class="panel" id="p-overview"><h3>数据总览</h3><div id="overview"></div></div>
+
+      <div class="panel" id="p-film" style="display:none"><h3>新建影片</h3>
+        <div class="row"><input id="f-title" placeholder="片名"><input id="f-otitle" placeholder="原名"><input id="f-year" placeholder="年份" type="number"></div>
+        <div class="row"><input id="f-syn" placeholder="简介" style="flex:1"></div>
+        <div class="row"><input id="f-fallback" placeholder="无法公开时的文字说明" style="flex:1"><label><input type="checkbox" id="f-fb-ok"> 说明已批准</label></div>
+        <button onclick="createFilm()">创建</button>
+        <hr><h3>添加署名（原样记录，可核实需来源）</h3>
+        <div class="row"><input id="cr-film" placeholder="影片ID" type="number"><input id="cr-name" placeholder="姓名"><input id="cr-role" placeholder="职责（如 摄影助理）"></div>
+        <div class="row"><label><input type="checkbox" id="cr-ver"> 已核实</label><input id="cr-src" placeholder="核实来源"><button onclick="addCredit()">添加</button></div>
+      </div>
+
+      <div class="panel" id="p-version" style="display:none"><h3>新建剪辑版本</h3>
+        <div class="row"><input id="v-film" placeholder="影片ID" type="number">
+          <select id="v-label"><option value="festival">影展版</option><option value="public">公开版</option><option value="director">导演版</option></select>
+          <input id="v-runtime" placeholder="时长(秒)" type="number"><input id="v-note" placeholder="版本说明"><button onclick="createVersion()">创建</button></div>
+        <hr><h3>发布 / 定时上线</h3>
+        <div class="row"><input id="p-vid" placeholder="版本ID" type="number">
+          <label><input type="checkbox" id="p-supersede"> 替换当前已发布版本</label>
+          <button onclick="publish()">发布</button></div>
+        <div class="row"><input id="rl-vid" placeholder="版本ID" type="number">
+          <label><input type="checkbox" id="rl-approved" checked> 批准</label>
+          <input id="rl-nb" type="datetime-local" title="定时上线时间（留空=立即）">
+          <button onclick="setRelease()">写入发布清单</button></div>
+      </div>
+
+      <div class="panel" id="p-license" style="display:none"><h3>新增许可</h3>
+        <div class="row"><input id="l-film" placeholder="影片ID" type="number"><input id="l-version" placeholder="版本ID(可空)" type="number">
+          <select id="l-kind"><option>poster</option><option>still</option><option>trailer</option><option>clip</option><option>full_film</option><option>subtitle</option></select></div>
+        <div class="row"><input id="l-terr" placeholder="地域(逗号分隔, WORLD 全球)" value="WORLD">
+          <input id="l-start" type="datetime-local"><input id="l-end" type="datetime-local" title="留空=无固定截止">
+          <button onclick="createLicense()">创建</button></div>
+        <hr><h3>提前终止授权</h3>
+        <div class="row"><input id="t-lid" placeholder="许可ID" type="number"><input id="t-reason" placeholder="终止原因"><button onclick="terminate()">立即终止</button></div>
+      </div>
+
+      <div class="panel" id="p-asset" style="display:none"><h3>登记资产</h3>
+        <div class="row"><input id="a-film" placeholder="影片ID" type="number"><input id="a-version" placeholder="版本ID(海报/剧照留空)" type="number">
+          <select id="a-kind"><option>poster</option><option>still</option><option>trailer</option><option>clip</option><option>full_film</option><option>subtitle</option></select>
+          <input id="a-path" placeholder="存储路径 data/media/..."><button onclick="createAsset()">登记</button></div>
+        <hr><h3>字幕修订</h3>
+        <div class="row"><input id="r-asset" placeholder="原资产ID" type="number"><input id="r-path" placeholder="新文件路径(可空)"><button onclick="revise()">提交新修订</button></div>
+      </div>
+
+      <div class="panel" id="p-screening" style="display:none"><h3>放映记录补录（必须绑定实际版本）</h3>
+        <div class="row"><input id="s-film" placeholder="影片ID" type="number"><input id="s-version" placeholder="版本ID" type="number">
+          <input id="s-date" type="date"></div>
+        <div class="row"><input id="s-event" placeholder="活动/影展"><input id="s-venue" placeholder="场馆">
+          <input id="s-city" placeholder="城市"><input id="s-country" placeholder="国家/地区"><input id="s-src" placeholder="来源">
+          <button onclick="addScreening()">补录</button></div>
+      </div>
+
+      <div class="panel" id="p-contacts" style="display:none"><h3>联系表单队列（按类别隔离）</h3>
+        <div class="row"><select id="q-cat"><option value="">全部</option><option value="cooperation">合作</option><option value="screening">放映</option><option value="interview">采访</option></select>
+        <button onclick="loadContacts()">刷新</button></div><div id="contacts"></div>
+      </div>
+
+      <div class="panel" id="p-audit" style="display:none"><h3>审计日志</h3><div id="audit"></div></div>
+    </div>
+  </div>
+</main>
+<script>
+let TOKEN = localStorage.getItem('adminToken') || '';
+const H = () => ({ 'Content-Type':'application/json', 'x-admin-token': TOKEN });
+async function api(path, method='GET', body) {
+  const res = await fetch('/api/admin' + path, { method, headers: H(), body: body ? JSON.stringify(body) : undefined });
+  const j = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(j.error || res.status); e.payload = j; throw e; }
+  return j;
+}
+function flash(text, ok=true) { const m = document.getElementById('msg'); m.className = 'msg ' + (ok?'ok':'err'); m.textContent = text; setTimeout(()=>m.className='msg', 4000); }
+async function login() {
+  TOKEN = document.getElementById('token').value.trim();
+  try { await api('/overview'); localStorage.setItem('adminToken', TOKEN);
+    document.getElementById('login').style.display='none'; document.getElementById('console').style.display='grid'; show('overview');
+  } catch { const m=document.getElementById('loginMsg'); m.className='msg err'; m.textContent='令牌无效'; }
+}
+function show(p) { document.querySelectorAll('.panel').forEach(e=>e.style.display='none');
+  document.getElementById('p-'+p).style.display='block';
+  document.querySelectorAll('.admin-menu button').forEach(b=>b.classList.toggle('active', b.dataset.p===p));
+  if (p==='overview') loadOverview(); if (p==='contacts') loadContacts(); if (p==='audit') loadAudit(); }
+async function loadOverview() {
+  const o = await api('/overview');
+  let h = '<h4>影片</h4><table><tr><th>ID</th><th>片名</th><th>年份</th></tr>' + o.films.map(f=>`<tr><td>${f.id}</td><td>${f.title}</td><td>${f.year||''}</td></tr>`).join('') + '</table>';
+  h += '<h4>版本</h4><table><tr><th>ID</th><th>影片</th><th>剪辑</th><th>状态</th><th>发布者</th></tr>' + o.versions.map(v=>`<tr><td>${v.id}</td><td>${v.film_id}</td><td>${v.label}#${v.seq}</td><td>${v.status}</td><td>${v.published_by||''}</td></tr>`).join('') + '</table>';
+  h += '<h4>许可</h4><table><tr><th>ID</th><th>影片</th><th>媒介</th><th>地域</th><th>时段</th><th>状态</th></tr>' + o.licenses.map(l=>`<tr><td>${l.id}</td><td>${l.film_id}</td><td>${l.media_kind}</td><td>${l.territories}</td><td>${(l.start_at||'').slice(0,10)} ~ ${l.end_at? l.end_at.slice(0,10):'∞'}</td><td>${l.status}</td></tr>`).join('') + '</table>';
+  h += '<h4>发布清单</h4><table><tr><th>ID</th><th>版本</th><th>批准</th><th>定时上线</th></tr>' + o.release_list.map(r=>`<tr><td>${r.id}</td><td>${r.version_id}</td><td>${r.approved?'✓':'✗'}</td><td>${r.not_before||'立即'}</td></tr>`).join('') + '</table>';
+  document.getElementById('overview').innerHTML = h;
+}
+async function createFilm() { try { const j = await api('/films','POST',{title:val('f-title'),original_title:val('f-otitle'),year:num('f-year'),synopsis:val('f-syn'),fallback_text:val('f-fallback'),fallback_approved:chk('f-fb-ok')}); flash('影片已创建 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function addCredit() { try { const j = await api('/films/'+num('cr-film')+'/credits','POST',{person_name:val('cr-name'),role:val('cr-role'),verified:chk('cr-ver'),source:val('cr-src')}); flash('署名已添加 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function createVersion() { try { const j = await api('/versions','POST',{film_id:num('v-film'),label:val('v-label'),runtime_sec:num('v-runtime'),cut_note:val('v-note')}); flash('版本已创建 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function publish() { try { const j = await api('/versions/'+num('p-vid')+'/publish','POST',{supersede:chk('p-supersede')}); flash('发布结果: '+JSON.stringify(j)); } catch(e){ flash('发布被拒: '+(e.payload&&e.payload.error||e.message)+' (当前已发布版本ID: '+(e.payload&&e.payload.current_version_id||'-')+')',false); } }
+async function setRelease() { try { const nb=val('rl-nb'); const j = await api('/release-list','POST',{version_id:num('rl-vid'),approved:chk('rl-approved'),not_before: nb? new Date(nb).toISOString(): null}); flash('发布清单已写入 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function createLicense() { try { const j = await api('/licenses','POST',{film_id:num('l-film'),version_id:num('l-version')||null,media_kind:val('l-kind'),territories:val('l-terr').split(',').map(s=>s.trim()),start_at:dt('l-start'),end_at:dt('l-end')}); flash('许可已创建 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function terminate() { try { const j = await api('/licenses/'+num('t-lid')+'/terminate','POST',{reason:val('t-reason')}); flash('许可 '+j.id+' 已终止，缓存已即时失效'); } catch(e){ flash(e.message,false); } }
+async function createAsset() { try { const j = await api('/assets','POST',{film_id:num('a-film'),version_id:num('a-version')||null,kind:val('a-kind'),storage_path:val('a-path')}); flash('资产已登记 ID='+j.id); } catch(e){ flash(e.message,false); } }
+async function revise() { try { const j = await api('/assets/'+num('r-asset')+'/revise','POST',{storage_path:val('r-path')||undefined}); flash('新修订 v'+j.revision+' 已生效，旧修订保留'); } catch(e){ flash(e.message,false); } }
+async function addScreening() { try { const j = await api('/screenings','POST',{film_id:num('s-film'),version_id:num('s-version'),screened_at:new Date(val('s-date')).toISOString(),event_name:val('s-event'),venue:val('s-venue'),city:val('s-city'),country:val('s-country'),source:val('s-src')}); flash('放映记录已补录 ID='+j.id); } catch(e){ flash('失败: '+(e.payload&&e.payload.error||e.message),false); } }
+async function loadContacts() { const c = await api('/contacts'+(val('q-cat')?('?category='+val('q-cat')):''));
+  document.getElementById('contacts').innerHTML = '<table><tr><th>ID</th><th>类别</th><th>姓名</th><th>邮箱</th><th>留言</th><th>私密材料</th><th>状态</th></tr>' +
+  c.contacts.map(x=>`<tr><td>${x.id}</td><td>${x.category}</td><td>${x.name}</td><td>${x.email}</td><td>${x.message}</td><td>${x.private_material? '🔒 '+x.private_material : ''}</td><td>${x.status}</td></tr>`).join('') + '</table>'; }
+async function loadAudit() { const a = await api('/audit');
+  document.getElementById('audit').innerHTML = '<table><tr><th>时间</th><th>操作者</th><th>动作</th><th>对象</th></tr>' +
+  a.audit.map(x=>`<tr><td>${x.created_at.slice(0,19)}</td><td>${x.actor}</td><td>${x.action}</td><td>${x.entity}#${x.entity_id}</td></tr>`).join('') + '</table>'; }
+const val=(i)=>document.getElementById(i).value.trim(), num=(i)=>Number(val(i))||null, chk=(i)=>document.getElementById(i).checked, dt=(i)=>val(i)?new Date(val(i)).toISOString():null;
+if (TOKEN) { document.getElementById('token').value = TOKEN; login(); }
+</script>
+</body>
+</html>

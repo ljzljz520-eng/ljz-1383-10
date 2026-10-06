@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="site">
+  <div><h1>青年导演短片档案</h1><div class="sub">YOUTH SHORT FILM ARCHIVE</div></div>
+  <nav><a href="/index.html">档案</a><a href="/admin.html">后台管理</a></nav>
+</header>
+<main>
+  <div class="searchbar">
+    <input id="q" placeholder="搜索片名 / 原名…" onkeydown="if(event.key==='Enter')load()">
+    <select id="territory">
+      <option value="WORLD">全球</option><option value="CN">中国大陆</option>
+      <option value="US">美国</option><option value="FR">法国</option>
+    </select>
+    <button onclick="load()">搜索</button>
+  </div>
+  <div id="grid" class="grid"></div>
+</main>
+<footer>放映记录均绑定实际剪辑版本 · 媒介可见性按许可实时计算</footer>
+<script>
+async function load() {
+  const q = document.getElementById('q').value;
+  const t = document.getElementById('territory').value;
+  const res = await fetch(`/api/films?query=${encodeURIComponent(q)}&territory=${t}`);
+  const { films } = await res.json();
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (const f of films) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const posterHtml = f.poster.available
+      ? `<img class="poster" data-film="${f.id}" alt="${f.title} 海报">`
+      : `<div class="poster" style="display:flex;align-items:center;justify-content:center;color:#999">海报暂不可公开</div>`;
+    card.innerHTML = `<a href="/film.html?id=${f.id}" style="text-decoration:none;color:inherit">
+      ${posterHtml}<div class="body"><h3>${f.title}</h3>
+      <div class="meta">${f.original_title || ''} · ${f.year || ''}</div>
+      <div class="meta">${f.published_version ? `<span class="badge ok">${labelOf(f.published_version.label)}</span>` : '<span class="badge">暂无公开版本</span>'}
+      ${f.has_full_film ? '<span class="badge ok">完整片可看</span>' : '<span class="badge no">完整片不可看</span>'}</div>
+      </div></a>`;
+    grid.appendChild(card);
+    if (f.poster.available) loadPoster(f.id, card.querySelector('img'));
+  }
+}
+function labelOf(l){ return {festival:'影展版',public:'公开版',director:'导演版'}[l]||l; }
+async function loadPoster(filmId, img) {
+  // 海报也需经“申请令牌 → 流式获取”，不直接暴露文件地址
+  const detail = await (await fetch(`/api/films/${filmId}`)).json();
+  const assetId = detail.media.poster.asset_id;
+  if (!assetId) return;
+  const tok = await (await fetch(`/api/media/${assetId}/request-download`, {method:'POST',
+    headers:{'Content-Type':'application/json'}, body:'{}'})).json();
+  if (tok.stream_url) img.src = tok.stream_url;
+}
+load();
+</script>
+</body>
+</html>

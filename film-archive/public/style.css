@@ -1,0 +1,48 @@
+:root { --ink:#1a1a2e; --paper:#f7f5f0; --accent:#c0392b; --muted:#6b6b7b; --card:#ffffff; }
+* { box-sizing: border-box; margin: 0; }
+body { font-family: "Songti SC","Noto Serif SC",Georgia,serif; background: var(--paper); color: var(--ink); line-height: 1.7; }
+header.site { padding: 2.2rem 6vw 1.2rem; border-bottom: 2px solid var(--ink); display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem;}
+header.site h1 { font-size: 1.9rem; letter-spacing: .12em; }
+header.site .sub { color: var(--muted); font-size: .85rem; letter-spacing:.3em; }
+nav a { color: var(--ink); margin-left: 1.2rem; text-decoration: none; border-bottom: 1px solid transparent; }
+nav a:hover { border-color: var(--accent); color: var(--accent); }
+main { padding: 2rem 6vw 4rem; }
+.searchbar { display:flex; gap:.6rem; margin-bottom: 2rem; }
+.searchbar input { flex:1; padding:.6rem .9rem; font-size:1rem; border:1px solid var(--ink); background:#fff; font-family:inherit;}
+button, .btn { padding:.6rem 1.2rem; background:var(--ink); color:#fff; border:none; cursor:pointer; font-family:inherit; font-size:.95rem; letter-spacing:.05em;}
+button:hover { background: var(--accent); }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:1.6rem; }
+.card { background:var(--card); border:1px solid #ddd; transition:transform .15s; }
+.card:hover { transform: translateY(-3px); box-shadow:0 6px 18px rgba(0,0,0,.08); }
+.card .poster { width:100%; aspect-ratio: 5/7; object-fit:cover; display:block; background:#e8e4dc;}
+.card .body { padding:.9rem 1rem 1.1rem; }
+.card h3 { font-size:1.1rem; }
+.card .meta { color:var(--muted); font-size:.82rem; margin-top:.2rem;}
+.badge { display:inline-block; font-size:.72rem; padding:.1rem .5rem; border:1px solid var(--muted); color:var(--muted); margin-right:.3rem; border-radius:2px;}
+.badge.ok { border-color:#2e7d32; color:#2e7d32; }
+.badge.no { border-color:var(--accent); color:var(--accent); }
+.detail-head { display:grid; grid-template-columns: 240px 1fr; gap:2rem; margin-bottom:2.5rem;}
+.detail-head img { width:100%; border:1px solid #ccc; }
+section.block { margin-bottom:2.2rem; }
+section.block h2 { font-size:1.15rem; border-left:4px solid var(--accent); padding-left:.7rem; margin-bottom:1rem; letter-spacing:.1em;}
+table { width:100%; border-collapse:collapse; background:#fff; }
+th,td { text-align:left; padding:.55rem .8rem; border-bottom:1px solid #e5e1d8; font-size:.92rem; vertical-align:top;}
+th { color:var(--muted); font-weight:normal; font-size:.8rem; letter-spacing:.08em;}
+.notice { background:#fdf6e3; border:1px solid #e0d5b0; padding:1rem 1.2rem; margin:1rem 0; }
+.media-row { display:flex; gap:1rem; flex-wrap:wrap; }
+.media-item { background:#fff; border:1px solid #ddd; padding:1rem; width:230px; }
+.media-item img { width:100%; }
+form.stack { display:grid; gap:.7rem; max-width:560px; }
+form.stack input, form.stack select, form.stack textarea { padding:.55rem .7rem; border:1px solid #bbb; font-family:inherit; font-size:.95rem; background:#fff;}
+.admin-layout { display:grid; grid-template-columns: 260px 1fr; gap:2rem; align-items:start;}
+.admin-menu button { display:block; width:100%; text-align:left; margin-bottom:.4rem; background:#fff; color:var(--ink); border:1px solid #ccc;}
+.admin-menu button.active, .admin-menu button:hover { background:var(--ink); color:#fff;}
+.panel { background:#fff; border:1px solid #ddd; padding:1.4rem; }
+.panel h3 { margin-bottom:1rem; }
+.row { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin-bottom:.5rem;}
+.row input,.row select { padding:.45rem .6rem; border:1px solid #bbb; font-family:inherit;}
+.msg { padding:.6rem .9rem; margin:.8rem 0; display:none;}
+.msg.ok { display:block; background:#e8f5e9; border:1px solid #a5d6a7;}
+.msg.err { display:block; background:#ffebee; border:1px solid #ef9a9a;}
+footer { padding:2rem 6vw; color:var(--muted); font-size:.8rem; border-top:1px solid #ddd;}
+.version-tag { font-size:.75rem; background:var(--ink); color:#fff; padding:.1rem .5rem; border-radius:2px; }
