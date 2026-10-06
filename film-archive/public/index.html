@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>青年导演短片档案</h1><span class="sub">YOUTH SHORT FILM ARCHIVE</span>
+  <div class="spacer"></div>
+  <input id="q" type="text" placeholder="搜索片名 / 导演…" style="width:220px">
+  <span id="region"></span>
+  <a href="/admin.html" class="badge">后台</a>
+</header>
+<main>
+  <div id="list" class="grid"></div>
+</main>
+<script src="/common.js"></script>
+<script>
+regionSelector(document.getElementById('region'));
+const q = document.getElementById('q');
+let timer;
+q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250); });
+
+async function load() {
+  const data = await api(`/api/films?region=${getRegion()}&query=${encodeURIComponent(q.value)}`);
+  const list = document.getElementById('list');
+  list.innerHTML = data.films.map(f => `
+    <a class="card" href="/film.html?id=${f.id}">
+      ${f.poster_media_id ? `<img src="/api/media/${f.poster_media_id}/file?region=${getRegion()}" alt="海报">`
+                          : `<img alt="无海报" style="display:flex">`}
+      <div class="body">
+        <h3>${f.title} <span class="muted" style="font-size:12px">${f.original_title || ''}</span></h3>
+        <div class="meta">${f.year || ''} · 导演 ${f.director_name}</div>
+        <div class="badges">${availabilityBadges(f.availability)}</div>
+        ${f.notice ? `<div class="notice">${f.notice}</div>` : ''}
+      </div>
+    </a>`).join('') || '<p class="muted">没有匹配的影片。</p>';
+}
+load();
+</script>
+</body>
+</html>

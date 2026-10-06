@@ -1,0 +1,17 @@
+{
+  "name": "youth-short-film-archive",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test tests/"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "青年导演短片档案：版本绑定放映记录、分类型许可可见性、发布冲突处理",
+  "dependencies": {
+    "express": "^5.2.1",
+    "sql.js": "^1.14.2"
+  }
+}

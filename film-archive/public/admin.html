@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后台管理 · 青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <h1><a href="/" style="color:inherit">← 档案</a> · 后台管理</h1>
+  <div class="spacer"></div>
+  <input id="token" type="text" placeholder="管理员令牌" style="width:200px">
+  <button onclick="saveToken()">保存令牌</button>
+  <span id="who" class="muted"></span>
+</header>
+<main>
+  <div class="tabs">
+    <button data-tab="versions" class="active">版本与发布</button>
+    <button data-tab="licenses">许可</button>
+    <button data-tab="screenings">放映记录</button>
+    <button data-tab="contacts">联系队列</button>
+    <button data-tab="credits">署名</button>
+    <button data-tab="events">发布审计</button>
+  </div>
+  <div id="out"></div>
+</main>
+<script src="/common.js"></script>
+<script>
+const tokenEl = document.getElementById('token');
+tokenEl.value = localStorage.getItem('adminToken') || '';
+function saveToken() { localStorage.setItem('adminToken', tokenEl.value); load(); }
+function H() { return { 'X-Admin-Token': localStorage.getItem('adminToken') || '', 'Content-Type': 'application/json' }; }
+async function aapi(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { ...H(), ...(opts.headers || {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || res.status); e.status = res.status; e.data = data; throw e; }
+  return data;
+}
+const out = document.getElementById('out');
+let tab = 'versions';
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); tab = b.dataset.tab; load();
+});
+
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load() {
+  try { await ({ versions, licenses, screenings, contacts, credits, events })[tab](); }
+  catch (e) { out.innerHTML = `<p class="err">${esc(e.message)} ${e.status===401?'（请填写有效的管理员令牌，如 token-admin-a / token-admin-b）':''}</p>`; }
+}
+
+async function versions() {
+  const { films } = await aapi('/api/admin/films');
+  out.innerHTML = films.map(f => `
+    <div class="panel"><h2>#${f.id} ${esc(f.title)}（${esc(f.director_name)}）</h2>
+    <table><tr><th>版本</th><th>说明</th><th>字幕修订</th><th>状态</th><th>槽位</th><th>操作</th></tr>
+    ${f.versions.map(v => `<tr>
+      <td>#${v.id} ${VERSION_LABELS[v.label]||v.label}</td><td>${esc(v.cut_note)}</td>
+      <td>v${v.subtitle_revision}</td>
+      <td>${v.status}${v.scheduled_publish_at?`<br><span class="muted">${esc(v.scheduled_publish_at)}</span>`:''}</td>
+      <td>${v.slot||'—'}</td>
+      <td>
+        <button onclick="pub(${v.id},'web_public')">发布到线上</button>
+        <button onclick="pub(${v.id},'festival_circuit')">发布到影展线</button>
+        <button onclick="pubForce(${v.id})">强制替换线上</button>
+        <button onclick="sched(${v.id})">定时上线</button>
+        <button onclick="subRev(${v.id})">字幕修订+1</button>
+        <button onclick="unpub(${v.id})">下线</button>
+      </td></tr>`).join('')}
+    </table>
+    <details><summary class="muted">新建版本</summary>
+      <label class="f">类型</label><select id="nl-${f.id}"><option value="festival">影展版</option><option value="public">公开版</option><option value="director">导演版</option></select>
+      <label class="f">说明</label><input id="nn-${f.id}" type="text">
+      <p><button onclick="newVersion(${f.id})">创建</button></p>
+    </details></div>`).join('');
+  document.getElementById('who').textContent = '';
+}
+async function pub(id, slot) { await run(() => aapi(`/api/admin/versions/${id}/publish`, { method:'POST', body: JSON.stringify({ slot }) })); }
+async function pubForce(id) { await run(() => aapi(`/api/admin/versions/${id}/publish`, { method:'POST', body: JSON.stringify({ slot:'web_public', force:true }) })); }
+async function sched(id) {
+  const t = prompt('定时上线时间（ISO，如 2026-12-01T12:00:00Z）'); if (!t) return;
+  await run(() => aapi(`/api/admin/versions/${id}/publish`, { method:'POST', body: JSON.stringify({ slot:'web_public', scheduled_at:t }) }));
+}
+async function unpub(id) { await run(() => aapi(`/api/admin/versions/${id}/unpublish`, { method:'POST', body:'{}' })); }
+async function subRev(id) { await run(() => aapi(`/api/admin/versions/${id}/subtitle-revision`, { method:'POST', body:'{}' })); }
+async function newVersion(filmId) {
+  const label = document.getElementById(`nl-${filmId}`).value, cut_note = document.getElementById(`nn-${filmId}`).value;
+  await run(() => aapi(`/api/admin/films/${filmId}/versions`, { method:'POST', body: JSON.stringify({ label, cut_note }) }));
+}
+async function run(fn) { try { await fn(); load(); } catch (e) { alert(`操作失败：${e.message}\n${JSON.stringify(e.data?.details||'')}`); } }
+
+async function licenses() {
+  const { licenses } = await aapi('/api/admin/licenses');
+  const { films } = await aapi('/api/admin/films');
+  out.innerHTML = `
+    <div class="panel"><h2>新增许可</h2><div class="cols">
+      <div><label class="f">影片</label><select id="lf">${films.map(f=>`<option value="${f.id}">#${f.id} ${esc(f.title)}</option>`).join('')}</select></div>
+      <div><label class="f">素材类型</label><select id="lk">${['poster','still','trailer','clip','full'].map(k=>`<option>${k}</option>`).join('')}</select></div>
+      <div><label class="f">地域（GLOBAL 或地区码）</label><input id="lt" type="text" value="GLOBAL"></div>
+      <div><label class="f">媒介</label><select id="lm"><option>web</option><option>festival</option><option>broadcast</option><option>all</option></select></div>
+      <div><label class="f">开始（ISO）</label><input id="ls" type="text" value="2026-01-01T00:00:00.000Z"></div>
+      <div><label class="f">结束（ISO）</label><input id="le" type="text" value="2027-12-31T23:59:59.000Z"></div>
+    </div><p><button class="primary" onclick="addLic()">创建许可</button></p></div>
+    <div class="panel"><h2>许可列表</h2><table>
+      <tr><th>ID</th><th>影片</th><th>类型</th><th>地域</th><th>媒介</th><th>时段</th><th>状态</th><th></th></tr>
+      ${licenses.map(l=>`<tr><td>#${l.id}</td><td>${l.film_id}</td><td>${l.asset_kind}</td><td>${l.territory}</td><td>${l.media}</td>
+        <td class="muted">${esc(l.starts_at)} → ${esc(l.ends_at)}</td>
+        <td>${l.status==='active'?'有效':`已终止<br><span class="muted">${esc(l.terminated_at||'')}</span>`}</td>
+        <td>${l.status==='active'?`<button onclick="termLic(${l.id})">提前终止</button>`:''}</td></tr>`).join('')}
+    </table></div>`;
+}
+async function addLic() {
+  await run(() => aapi('/api/admin/licenses', { method:'POST', body: JSON.stringify({
+    film_id: +lf.value, asset_kind: lk.value, territory: lt.value, media: lm.value, starts_at: ls.value, ends_at: le.value }) }));
+}
+async function termLic(id) { if (confirm('确认提前终止该许可？立即生效。')) await run(() => aapi(`/api/admin/licenses/${id}/terminate`, { method:'POST', body:'{}' })); }
+
+async function screenings() {
+  const { films } = await aapi('/api/admin/films');
+  const opts = films.flatMap(f => f.versions.map(v => `<option value="${v.id}">#${v.id} ${esc(f.title)} · ${VERSION_LABELS[v.label]||v.label}（${esc(v.cut_note)}）</option>`)).join('');
+  out.innerHTML = `
+    <div class="panel"><h2>补录放映记录（绑定实际版本，不按片名合并）</h2><div class="cols">
+      <div><label class="f">版本</label><select id="sv">${opts}</select></div>
+      <div><label class="f">影展/活动</label><input id="sf" type="text"></div>
+      <div><label class="f">场地</label><input id="svv" type="text"></div>
+      <div><label class="f">城市</label><input id="sc" type="text"></div>
+      <div><label class="f">国家/地区</label><input id="sco" type="text" value="CN"></div>
+      <div><label class="f">放映时间（ISO，可为历史日期）</label><input id="st" type="text" value="2024-01-01T12:00:00.000Z"></div>
+    </div><label class="f">备注</label><input id="sn" type="text">
+    <p><button class="primary" onclick="addScr()">补录</button></p></div>
+    <div id="scrList"></div>`;
+  const lists = await Promise.all(films.map(f => fetch(`/api/films/${f.id}/screenings`).then(r=>r.json())));
+  document.getElementById('scrList').innerHTML = lists.map(d => `
+    <div class="panel"><h2>${esc(d.title)}</h2><table>
+    <tr><th>时间</th><th>版本</th><th>影展</th><th>场地</th></tr>
+    ${d.screenings.map(s=>`<tr><td>${esc(s.screened_at)}</td><td>#${s.version_id} ${VERSION_LABELS[s.version_label]||s.version_label} · 字幕v${s.subtitle_revision}</td>
+      <td>${esc(s.festival_name)}</td><td>${esc([s.venue,s.city].filter(Boolean).join(' · '))}</td></tr>`).join('') || '<tr><td colspan=4 class=muted>暂无</td></tr>'}
+    </table></div>`).join('');
+}
+async function addScr() {
+  await run(() => aapi('/api/admin/screenings', { method:'POST', body: JSON.stringify({
+    version_id:+sv.value, festival_name:sf.value, venue:svv.value, city:sc.value, country:sco.value, screened_at:st.value, notes:sn.value }) }));
+}
+
+async function contacts() {
+  const cat = contacts.cat || '';
+  const { contacts } = await aapi('/api/admin/contacts' + (cat ? `?category=${cat}` : ''));
+  out.innerHTML = `
+    <div class="panel"><h2>联系队列</h2>
+    <p><select id="cc" onchange="contacts.cat=this.value;load()">
+      <option value="">全部</option>
+      ${[['collaboration','合作 → 制片'],['screening','放映 → 策展'],['interview','采访 → 宣传']].map(([v,t])=>`<option value="${v}" ${v===cat?'selected':''}>${t}</option>`).join('')}
+    </select></p>
+    <table><tr><th>ID</th><th>类别/队列</th><th>联系人</th><th>留言</th><th>私密材料</th><th>状态</th></tr>
+    ${contacts.map(c=>`<tr><td>#${c.id}</td><td>${c.category}<br><span class="muted">${c.routed_to}</span></td>
+      <td>${esc(c.name)}<br><span class="muted">${esc(c.email)} ${esc(c.org)}</span></td>
+      <td>${esc(c.message)}</td>
+      <td>${c.has_private_material?`<a href="/api/admin/contacts/${c.id}/material" onclick="return dlMat(event,${c.id})">下载（需鉴权）</a>`:'—'}</td>
+      <td>${c.status}</td></tr>`).join('') || '<tr><td colspan=6 class=muted>暂无</td></tr>'}
+    </table></div>`;
+}
+async function dlMat(ev, id) {
+  ev.preventDefault();
+  const res = await fetch(`/api/admin/contacts/${id}/material`, { headers: H() });
+  if (!res.ok) return alert('无权访问或材料不存在');
+  const blob = await res.blob(); const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `material-${id}.bin`; a.click();
+  return false;
+}
+
+async function credits() {
+  const { films } = await aapi('/api/admin/films');
+  out.innerHTML = `<div class="panel"><h2>新增署名（按来源原文记录，不自动升格）</h2><div class="cols">
+    <div><label class="f">影片</label><select id="cf">${films.map(f=>`<option value="${f.id}">#${f.id} ${esc(f.title)}</option>`).join('')}</select></div>
+    <div><label class="f">姓名</label><input id="cn" type="text"></div>
+    <div><label class="f">职责（原文）</label><input id="cr" type="text"></div>
+    <div><label class="f">来源</label><input id="cs" type="text"></div>
+    <div><label class="f">已核实</label><select id="cv"><option value="1">是</option><option value="0" selected>否</option></select></div>
+  </div><p><button class="primary" onclick="addCredit()">保存</button></p></div>`;
+}
+async function addCredit() {
+  await run(() => aapi('/api/admin/credits', { method:'POST', body: JSON.stringify({
+    film_id:+cf.value, person_name:cn.value, role:cr.value, source:cs.value, verified: cv.value==='1' }) }));
+}
+
+async function events() {
+  const { events } = await aapi('/api/admin/publish-events');
+  out.innerHTML = `<div class="panel"><h2>发布审计日志</h2><table>
+    <tr><th>时间</th><th>版本</th><th>操作者</th><th>动作</th><th>槽位</th><th>详情</th></tr>
+    ${events.map(e=>`<tr><td class="muted">${esc(e.created_at)}</td><td>#${e.version_id}</td><td>${esc(e.actor)}</td>
+      <td>${esc(e.action)}</td><td>${esc(e.slot)}</td><td class="muted">${esc(e.detail)}</td></tr>`).join('')}
+  </table></div>`;
+}
+
+load();
+</script>
+</body>
+</html>

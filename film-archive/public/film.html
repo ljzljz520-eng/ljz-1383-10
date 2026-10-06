@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>影片详情 · 青年导演短片档案</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <h1><a href="/" style="color:inherit">青年导演短片档案</a></h1>
+  <div class="spacer"></div>
+  <span id="region"></span>
+</header>
+<main id="main"><p class="muted">加载中…</p></main>
+<script src="/common.js"></script>
+<script>
+regionSelector(document.getElementById('region'));
+const id = new URLSearchParams(location.search).get('id');
+
+function fmt(s) { return s ? new Date(s).toLocaleString('zh-CN', { hour12: false }) : ''; }
+
+async function load() {
+  const main = document.getElementById('main');
+  let f;
+  try { f = await api(`/api/films/${id}?region=${getRegion()}`); }
+  catch (e) { main.innerHTML = `<p class="err">影片不存在。</p>`; return; }
+
+  const stills = (f.assets.still || []).map(a => `<img src="/api/media/${a}/file?region=${getRegion()}" alt="剧照">`).join('');
+  const versions = f.versions.map(v => `
+    <div class="panel">
+      <h2>${VERSION_LABELS[v.label] || v.label} <span class="muted" style="font-size:12px">${v.cut_note || ''} · 字幕修订 v${v.subtitle_revision}</span></h2>
+      ${v.screenings.length ? `<table>
+        <tr><th>时间</th><th>影展/活动</th><th>场地</th><th>备注</th></tr>
+        ${v.screenings.map(s => `<tr>
+          <td>${fmt(s.screened_at)}</td><td>${s.festival_name || '—'}</td>
+          <td>${[s.venue, s.city, s.country].filter(Boolean).join(' · ')}</td><td>${s.notes || ''}</td>
+        </tr>`).join('')}
+      </table>` : '<p class="muted">该版本暂无公开放映记录。</p>'}
+    </div>`).join('');
+
+  const credits = f.credits.map(c => `
+    <tr><td>${c.person_name}</td><td>${c.role}</td>
+    <td>${c.verified ? '<span class="tag-verified">已核实</span>' : '<span class="tag-unverified">待核实</span>'}</td>
+    <td class="muted">${c.source || ''}</td></tr>`).join('');
+
+  main.innerHTML = `
+    <div class="row">
+      <div style="flex:0 0 260px">
+        ${f.poster_media_id ? `<img src="/api/media/${f.poster_media_id}/file?region=${getRegion()}" style="width:100%;border-radius:10px;border:1px solid var(--line)">` : ''}
+      </div>
+      <div style="flex:1;min-width:280px">
+        <h2 style="margin-top:0">${f.title} <span class="muted" style="font-size:14px">${f.original_title || ''}</span></h2>
+        <p class="muted">${f.year || ''} · 导演 ${f.director_name}</p>
+        <p>${f.synopsis || ''}</p>
+        <div class="badges">${availabilityBadges(f.availability)}</div>
+        ${f.notice ? `<div class="notice">📢 ${f.notice}</div>` : ''}
+        ${f.availability.trailer ? `<p class="ok">✓ 预告片可在线观看</p>` : ''}
+        ${f.availability.clip ? `<p class="ok">✓ 有经批准的公开片段</p>` : ''}
+        ${f.availability.full ? `<p class="ok">✓ 完整影片当前地区可观看</p>` : ''}
+      </div>
+    </div>
+    ${stills ? `<div class="panel"><h2>剧照</h2><div class="stills">${stills}</div></div>` : ''}
+    <h2 style="margin:22px 0 12px">版本与放映记录</h2>
+    ${versions || '<p class="muted">暂无公开版本。</p>'}
+    <div class="panel"><h2>署名（按来源原文记录）</h2>
+      <table><tr><th>姓名</th><th>职责</th><th>核实状态</th><th>来源</th></tr>${credits}</table>
+    </div>`;
+}
+load();
+</script>
+</body>
+</html>
